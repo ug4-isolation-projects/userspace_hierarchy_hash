@@ -13,7 +13,7 @@ int main()
     printf("   If this was the only value in a bucket, the bucket should be destroyed.\n");
     printf("3. \"print\": Print the contents of a bucket (i.e its sub buckets and their contents).\n");
     printf("4. \"exit\": Exit the program.\n");
-    char* command = (char*)malloc(10);
+    char* command = (char*)malloc(10); //not concerned with safe input handling, just a testbench program
 
     ht* table = ht_create(BUCKETS_AMNT);
     if(table == NULL)

@@ -43,9 +43,9 @@ ht* ht_create(size_t capacity)
 
     for(size_t i = 0; i < table->capacity - 2; i++)
     {
-        table->entries[i].subtable = ht_subtable_create(32); //we don't need as much space, we're just hashing users to their locations in the table
+        table->entries[i].subtable = ht_subtable_create(SUBBUCKETS_AMNT);
     }
-    table->entries[table->capacity - 1].subtable = ht_subtable_create(128); //shared bucket - 128 is a provisional number subject to testing
+    table->entries[table->capacity - 1].subtable = ht_subtable_create(SHARED_SUBBUCKETS_AMNT); //shared bucket - 128 is a provisional number subject to testing
 
     return table;
 }
@@ -72,22 +72,41 @@ ht_subtable* ht_subtable_create(size_t capacity)
 
 void ht_add_entry(ht* table, const char* key, void* value, int uid, bool shared)
 {
+    //find the index in the primary level of the hash table
+
     size_t bucket_index = get_bucket_index((void*)key, shared);
 
-    //TODO: handle logic for shared bucket. we will need to consider open addressing and tombstoning to enforce 1 entry to each bucket.
+    //TODO: handle logic for shared bucket. we enforce 1 entry to each bucket. if there is a collision, we resize up, rehash everything and try again.
 
     printf("bucket_index: %lu\n", bucket_index);
 
     ht_entry* entry = &table->entries[bucket_index];
 
     ht_subtable* subtable = entry->subtable;
-    size_t sub_bucket_index = uid % subtable->capacity;
+
+    //find the sub bucket index in the subtable - if it is not shared, this is hashed by uid.
+    //if it is shared, hash as is done in linux
+
+    size_t sub_bucket_index;
+
+    if(!shared)
+    {
+        //if not shared, hash by uid
+        sub_bucket_index = uid % subtable->capacity;
+    }
+    else
+    {
+        //in the shared bucket, hash by address as in original implementation in linux
+        sub_bucket_index = jhash(&key, sizeof(key), 0) % subtable->capacity;
+    }
 
     printf("sub_bucket_index: %lu\n", sub_bucket_index);
 
     ht_subentry* subtable_entry = &subtable->entries[sub_bucket_index];
 
-    if(subtable_entry->entries == NULL)
+    //create the list of entries if it doesn't exist
+
+    if(!shared && subtable_entry->entries == NULL)
     {
         subtable_entry->entries = malloc(sizeof(ht_subentry_list));
         if(subtable_entry->entries == NULL)
@@ -99,6 +118,85 @@ void ht_add_entry(ht* table, const char* key, void* value, int uid, bool shared)
         subtable_entry->entries->count = 0;
         subtable_entry->entries->capacity = INIT_SUBLIST_SIZE;
         subtable_entry->entries->items = malloc(INIT_SUBLIST_SIZE * sizeof(ht_entry_item));
+
+        if(subtable_entry->entries->items == NULL)
+        {
+            free(subtable_entry->entries);
+            return; // deal with alloc failure later (TODO)
+        }
+    }
+
+    //shared policy - we enforce 1 entry per shared bucket. if there is a collision, we resize up, rehash everything
+    //it is important that we optimise numbers here such that resizing is kept to a minimum.
+
+    if(shared && subtable_entry->entries != NULL)
+    {
+        printf("Error: Shared bucket already has an entry, resizing...\n");
+        //keep a copy of the old entries object
+        ht_subentry* old_entries = malloc(subtable->capacity * sizeof(ht_subentry));
+        for(int i = 0; i < subtable->capacity; i++)
+        {
+            old_entries[i].entries = subtable->entries[i].entries;
+        }
+
+        //resize the subtable
+        subtable->capacity *= 2;
+
+        subtable->entries = realloc(subtable->entries, subtable->capacity * sizeof(ht_subentry));
+        memset(subtable->entries, 0, subtable->capacity * sizeof(ht_subentry));
+        if(subtable->entries == NULL)
+        {
+            perror("Error: Could not reallocate memory\n");
+            free(subtable->entries);
+            return; // deal with alloc failure later (TODO)
+        }
+        //rehash the entries
+        for(int i = 0; i < subtable->capacity / 2; i++)
+        {
+            //if the entry is not null, rehash it
+            if(old_entries[i].entries != NULL)
+            {
+                //Recreating the subtable entry
+                printf("Recreating subtable entry...\n");
+                ht_subentry* subtable_entry = &subtable->entries[i];
+                subtable_entry->entries = malloc(sizeof(ht_subentry_list));
+                if(subtable_entry->entries == NULL)
+                {
+                    free(subtable_entry->entries);
+                    return; // deal with alloc failure later (TODO)
+                }
+
+                subtable_entry->entries->count = 0;
+                subtable_entry->entries->capacity = 1; //only 1 entry in the shared sub bucket
+                subtable_entry->entries->items = malloc(sizeof(ht_entry_item));
+
+                printf("entry malloc#'d\n");
+
+                if(subtable_entry->entries->items == NULL)
+                {
+                    free(subtable_entry->entries);
+                    return; // deal with alloc failure later (TODO)
+                }
+            }
+        }
+        free(old_entries);
+    }
+
+    //if the shared bucket is empty, create a new entry
+
+    else if(shared && subtable_entry->entries == NULL)
+    {
+        printf("Shared bucket is empty, creating new entry...\n");
+        subtable_entry->entries = malloc(sizeof(ht_subentry_list));
+        if(subtable_entry->entries == NULL)
+        {
+            free(subtable_entry->entries);
+            return; // deal with alloc failure later (TODO)
+        }
+
+        subtable_entry->entries->count = 0;
+        subtable_entry->entries->capacity = 1; //only 1 entry in the shared sub bucket
+        subtable_entry->entries->items = malloc(sizeof(ht_entry_item));
 
         if(subtable_entry->entries->items == NULL)
         {
@@ -129,6 +227,8 @@ void ht_add_entry(ht* table, const char* key, void* value, int uid, bool shared)
 
 ht_entry_item* get_entry_item(ht* table, const char* key, int uid, bool shared)
 {
+    //find an item given a key and uid (and it it's shared or not)
+
     size_t bucket_index = get_bucket_index((void*)key, shared);
 
     ht_entry* entry = &table->entries[bucket_index];
@@ -141,7 +241,16 @@ ht_entry_item* get_entry_item(ht* table, const char* key, int uid, bool shared)
     }
 
     ht_subtable* subtable = entry->subtable;
-    size_t sub_bucket_index = uid % subtable->capacity;
+    size_t sub_bucket_index;
+    
+    if(!shared)
+    {
+        size_t sub_bucket_index = uid % subtable->capacity;
+    }
+    else
+    {
+        sub_bucket_index = jhash(&key, sizeof(key), 0) % subtable->capacity;
+    }
     ht_subentry* subtable_entry = &subtable->entries[sub_bucket_index];
 
     if(subtable_entry->entries == NULL)

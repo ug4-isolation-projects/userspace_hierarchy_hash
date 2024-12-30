@@ -70,7 +70,9 @@ ht_entry_item* get_entry_item(ht* table, const char* key, int uid, bool shared);
 void print_entries_in_subtable(ht* table, int uid, size_t bucket_index);
 
 #define INIT_SUBLIST_SIZE 32 //32 for now, we will test
-#define BUCKETS_AMNT 8192  // mirrors the amount of buckets in the futex hash table
+#define SHARED_SUBBUCKETS_AMNT 128 //128 for now, we will test
+#define SUBBUCKETS_AMNT 32
+#define BUCKETS_AMNT 8192  // mirrors a representative amount of buckets in the futex hash table (which is some multiple of cpu count)
 #define SHARED_BUCKET_INDEX (BUCKETS_AMNT - 1) // the index of the shared bucket
 
 #endif // _HASH_H
