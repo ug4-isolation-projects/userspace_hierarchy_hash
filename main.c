@@ -12,7 +12,8 @@ int main()
     printf("2. \"remove\": Remove a value from the hash table, given a theoretical uid and a value.\n");
     printf("   If this was the only value in a bucket, the bucket should be destroyed.\n");
     printf("3. \"print\": Print the contents of a bucket (i.e its sub buckets and their contents).\n");
-    printf("4. \"exit\": Exit the program.\n");
+    printf("4. \"resize\": Force add many values to a bucket to test resizing.\n");
+    printf("5. \"exit\": Exit the program.\n");
     char* command = (char*)malloc(10); //not concerned with safe input handling, just a testbench program
 
     ht* table = ht_create(BUCKETS_AMNT);
@@ -111,6 +112,10 @@ int main()
 
             print_entries_in_subtable(table, uid, bucket_index);
         }   
+        else if(strcmp(command, "resize") == 0)
+        {
+            resize_test(table);
+        }
         else
         {
             printf("Invalid command\n");

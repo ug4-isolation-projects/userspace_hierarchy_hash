@@ -112,7 +112,7 @@ void ht_add_entry(ht* table, const char* key, void* value, int uid, bool shared)
         if(subtable_entry->entries == NULL)
         {
             free(subtable_entry->entries);
-            return; // deal with alloc failure later (TODO)
+            return;
         }
 
         subtable_entry->entries->count = 0;
@@ -122,7 +122,7 @@ void ht_add_entry(ht* table, const char* key, void* value, int uid, bool shared)
         if(subtable_entry->entries->items == NULL)
         {
             free(subtable_entry->entries);
-            return; // deal with alloc failure later (TODO)
+            return;
         }
     }
 
@@ -148,7 +148,7 @@ void ht_add_entry(ht* table, const char* key, void* value, int uid, bool shared)
         {
             perror("Error: Could not reallocate memory\n");
             free(subtable->entries);
-            return; // deal with alloc failure later (TODO)
+            return;
         }
         //rehash the entries
         for(int i = 0; i < subtable->capacity / 2; i++)
@@ -163,7 +163,7 @@ void ht_add_entry(ht* table, const char* key, void* value, int uid, bool shared)
                 if(subtable_entry->entries == NULL)
                 {
                     free(subtable_entry->entries);
-                    return; // deal with alloc failure later (TODO)
+                    return;
                 }
 
                 subtable_entry->entries->count = 0;
@@ -175,11 +175,13 @@ void ht_add_entry(ht* table, const char* key, void* value, int uid, bool shared)
                 if(subtable_entry->entries->items == NULL)
                 {
                     free(subtable_entry->entries);
-                    return; // deal with alloc failure later (TODO)
+                    return;
                 }
             }
         }
         free(old_entries);
+        ht_add_entry(table, key, value, uid, shared);
+        return;
     }
 
     //if the shared bucket is empty, create a new entry
@@ -191,7 +193,7 @@ void ht_add_entry(ht* table, const char* key, void* value, int uid, bool shared)
         if(subtable_entry->entries == NULL)
         {
             free(subtable_entry->entries);
-            return; // deal with alloc failure later (TODO)
+            return; 
         }
 
         subtable_entry->entries->count = 0;
@@ -201,7 +203,7 @@ void ht_add_entry(ht* table, const char* key, void* value, int uid, bool shared)
         if(subtable_entry->entries->items == NULL)
         {
             free(subtable_entry->entries);
-            return; // deal with alloc failure later (TODO)
+            return; 
         }
     }
 
@@ -211,11 +213,12 @@ void ht_add_entry(ht* table, const char* key, void* value, int uid, bool shared)
     {
         //realloc
         entry_list->capacity *= 2;
+        printf("Resizing sublist...\n");
         ht_entry_item* new_items = realloc(entry_list->items, entry_list->capacity * sizeof(ht_entry_item));
         if(new_items == NULL)
         {
             free(entry_list->items);
-            return; // deal with alloc failure later (TODO)
+            return;
         }
         entry_list->items = new_items;
     }
@@ -242,7 +245,7 @@ ht_entry_item* get_entry_item(ht* table, const char* key, int uid, bool shared)
 
     ht_subtable* subtable = entry->subtable;
     size_t sub_bucket_index;
-    
+
     if(!shared)
     {
         size_t sub_bucket_index = uid % subtable->capacity;
@@ -396,6 +399,26 @@ void print_entries_in_subtable(ht* table, int uid, size_t bucket_index)
         printf("Key: %p\n", (void*)entry_list->items[i].key);
         printf("Value: %s\n", (char*)entry_list->items[i].value);
     }
+}
+
+
+//stress test functions
+
+void resize_test(ht* table)
+{
+    for(int i = 0; i < 100; i++)
+    {
+        printf("Adding entry %d\n", i);
+        //just uses the table pointer as the key to ensure it hashes to the same bucket
+        ht_add_entry(table, (void*)table, "test", 1, 0);
+    }
+    printf("Entries added\n, now downsizing...\n");
+    for(int i = 0; i < 100; i++)
+    {
+        printf("Removing entry %d\n", i);
+        ht_remove_entry(table, (void*)table, 1);
+    }
+    printf("Entries removed\n");
 }
 
 

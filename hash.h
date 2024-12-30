@@ -69,6 +69,10 @@ ht_entry_item* get_entry_item(ht* table, const char* key, int uid, bool shared);
 
 void print_entries_in_subtable(ht* table, int uid, size_t bucket_index);
 
+// test resizing the hash table
+
+void resize_test(ht* table);
+
 #define INIT_SUBLIST_SIZE 32 //32 for now, we will test
 #define SHARED_SUBBUCKETS_AMNT 128 //128 for now, we will test
 #define SUBBUCKETS_AMNT 32
