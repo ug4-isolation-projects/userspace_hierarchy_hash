@@ -111,7 +111,7 @@ void ht_add_entry(ht* table, const char* key, void* value, int uid, bool shared)
         subtable_entry->entries = malloc(sizeof(ht_subentry_list));
         if(subtable_entry->entries == NULL)
         {
-            free(subtable_entry);
+            perror("error: could not allocate memory for subtable entries.\n");
             return;
         }
 
@@ -121,8 +121,8 @@ void ht_add_entry(ht* table, const char* key, void* value, int uid, bool shared)
         subtable_entry->entries->items = malloc(INIT_SUBLIST_SIZE * sizeof(ht_entry_item));
         if(subtable_entry->entries->items == NULL)
         {
+            perror("error: could not allocate memory for subtable entry items.\n");
             free(subtable_entry->entries);
-            free(subtable_entry);
             return;
         }
     }
@@ -243,7 +243,7 @@ void ht_add_entry(ht* table, const char* key, void* value, int uid, bool shared)
 
 ht_entry_item* get_entry_item(ht* table, const char* key, int uid, bool shared)
 {
-    //find an item given a key and uid (and it it's shared or not)
+    //find an item given a key and uid (and if it's shared or not)
 
     size_t bucket_index = get_bucket_index((void*)key, shared);
     ht_entry* entry = &table->entries[bucket_index];
@@ -261,7 +261,7 @@ ht_entry_item* get_entry_item(ht* table, const char* key, int uid, bool shared)
     if(!shared)
     {
         //if not shared, hash by uid
-        size_t sub_bucket_index = uid % subtable->capacity;
+        sub_bucket_index = uid % subtable->capacity;
     }
     else
     {
@@ -270,7 +270,7 @@ ht_entry_item* get_entry_item(ht* table, const char* key, int uid, bool shared)
     }
     ht_subentry* subtable_entry = &subtable->entries[sub_bucket_index];
 
-    if(subtable_entry->entries == NULL)
+    if(subtable_entry == NULL)
     {
         perror("Error: Couldn't find subtable entries\n");
         return NULL;
@@ -278,13 +278,16 @@ ht_entry_item* get_entry_item(ht* table, const char* key, int uid, bool shared)
 
     ht_subentry_list* entry_list = subtable_entry->entries;
 
+    if(entry_list == NULL)
+    {
+        perror("Error: Couldn't find entry list\n");
+        return NULL;
+    }
+
     for(size_t i = 0; i < entry_list->count; i++)
     {
         if(strcmp(key, entry_list->items[i].key) == 0)
         {
-            printf("Found entry\n");
-            printf("Key: %p\n", (void*)entry_list->items[i].key);
-            printf("Value: %s\n", (char*)entry_list->items[i].value);
             return &entry_list->items[i];
         }
     }
