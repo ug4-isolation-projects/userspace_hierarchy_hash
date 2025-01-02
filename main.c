@@ -20,7 +20,6 @@ int main()
     if(table == NULL)
     {
         perror("Error: Memory allocation for main table failed\n");
-        free(table);
         return 1;
     }
 
@@ -38,8 +37,6 @@ int main()
             if(key == NULL || value == NULL)
             {
                 perror("Error: Memory allocation failed\n");
-                free(key);
-                free(value);
                 return 1;
             }
 
