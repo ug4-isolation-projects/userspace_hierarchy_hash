@@ -52,6 +52,9 @@ size_t get_bucket_index(void* addr, bool shared);
 // create a subtable and return a pointer to it, or NULL if out of memory
 ht_subtable* ht_subtable_create(size_t capacity);
 
+// helper function to init subtable entry
+void init_subentry(ht_subentry* subentry, size_t capacity);
+
 // add a value to the hash table based on a key's addr and uid
 void ht_add_entry(ht* table, const char* key, void* value, int uid, bool shared);
 

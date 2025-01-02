@@ -73,6 +73,27 @@ ht_subtable* ht_subtable_create(size_t capacity)
     return subtable;
 }
 
+void init_subentry(ht_subentry* subentry, size_t capacity)
+{
+    subentry->entries = malloc(capacity * sizeof(ht_subentry_list));
+    if(subentry->entries == NULL)
+    {
+        perror("error: could not allocate memory for subentry entries.\n");
+        return;
+    }
+
+    subentry->entries->count = 0;
+    subentry->entries->capacity = capacity;
+
+    subentry->entries->items = malloc(capacity * sizeof(ht_entry_item));
+    if(subentry->entries->items == NULL)
+    {
+        perror("error: could not allocate memory for subentry items.\n");
+        free(subentry->entries);
+        return;
+    }
+}
+
 void ht_add_entry(ht* table, const char* key, void* value, int uid, bool shared)
 {
     //find the index in the primary level of the hash table
@@ -108,29 +129,15 @@ void ht_add_entry(ht* table, const char* key, void* value, int uid, bool shared)
 
     if(!shared && subtable_entry->entries == NULL)
     {
-        subtable_entry->entries = malloc(sizeof(ht_subentry_list));
-        if(subtable_entry->entries == NULL)
-        {
-            perror("error: could not allocate memory for subtable entries.\n");
-            return;
-        }
-
-        subtable_entry->entries->count = 0;
-        subtable_entry->entries->capacity = INIT_SUBLIST_SIZE;
-
-        subtable_entry->entries->items = malloc(INIT_SUBLIST_SIZE * sizeof(ht_entry_item));
-        if(subtable_entry->entries->items == NULL)
-        {
-            perror("error: could not allocate memory for subtable entry items.\n");
-            free(subtable_entry->entries);
-            return;
-        }
+        init_subentry(subtable_entry, INIT_SUBLIST_SIZE);
     }
-
     //shared policy - we enforce 1 entry per shared bucket. if there is a collision, we resize up, rehash everything
     //it is important that we optimise numbers here such that resizing is kept to a minimum.
-
-    if(shared && subtable_entry->entries != NULL)
+    else if(shared && subtable_entry->entries == NULL)
+    {
+        init_subentry(subtable_entry, 1); //shared bucket only has 1 entry
+    }
+    else if(shared && subtable_entry->entries != NULL)
     {
         printf("Error: Shared bucket already has an entry, resizing...\n");
 
@@ -193,30 +200,6 @@ void ht_add_entry(ht* table, const char* key, void* value, int uid, bool shared)
         ht_add_entry(table, key, value, uid, shared); //recursive call to add the entry. will try again the resized table, and will
                                                       //resize again if it needs to (hopefully not!)
         return;
-    }
-
-    //if the shared bucket is empty, create a new entry
-
-    else if(shared && subtable_entry->entries == NULL)
-    {
-        printf("Shared bucket is empty, creating new entry...\n");
-        subtable_entry->entries = malloc(sizeof(ht_subentry_list));
-        if(subtable_entry->entries == NULL)
-        {
-            perror("error: could not allocate memory for subtable entries.\n");
-            return; 
-        }
-
-        subtable_entry->entries->count = 0;
-        subtable_entry->entries->capacity = 1; //only 1 entry in the shared sub bucket
-        subtable_entry->entries->items = malloc(sizeof(ht_entry_item));
-
-        if(subtable_entry->entries->items == NULL)
-        {
-            perror("error: could not allocate memory for subtable entry items.\n");
-            free(subtable_entry->entries);
-            return; 
-        }
     }
 
     ht_subentry_list* entry_list = subtable_entry->entries;
@@ -422,7 +405,6 @@ void print_entries_in_subtable(ht* table, int uid, size_t bucket_index)
     }
 }
 
-
 //stress test functions
 
 void resize_test(ht* table)
@@ -441,12 +423,3 @@ void resize_test(ht* table)
     }
     printf("Entries removed\n");
 }
-
-
-
-
-
-
-
-
-
