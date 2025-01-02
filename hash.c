@@ -1,5 +1,6 @@
 //this file contains code from the ht repository by Ben Hoyt, which is licensed under the MIT license
 //see hash.h for comments on each function
+//as this is the flipped branch, the hash table's top level bucket is hashed by uid, and the subtable's buckets are hashed by address
 
 #include "hash.h"
 #include "jhash.c"
@@ -12,14 +13,13 @@
 #include <stdio.h>
 
 
-size_t get_bucket_index(void* addr, bool shared)
+size_t get_bucket_index(ht* table, int uid, bool shared)
 {
-    if (shared)
+    if(shared)
     {
-        return SHARED_BUCKET_INDEX;
+        return table->capacity - 1; //shared bucket is the last bucket
     }
-    uint32_t hash = jhash(&addr, sizeof(addr), 0);
-    return hash % (BUCKETS_AMNT - 2); // the shared bucket is the last bucket
+    return uid - 1; //uid 1 would be index 0, uid 2 would be index 1, etc.
 }
 
 ht* ht_create(size_t capacity) 
@@ -98,28 +98,18 @@ void ht_add_entry(ht* table, const char* key, void* value, int uid, bool shared)
 {
     //find the index in the primary level of the hash table
 
-    size_t bucket_index = get_bucket_index((void*)key, shared);
+    size_t bucket_index = get_bucket_index(table, uid, shared);
 
     printf("bucket_index: %lu\n", bucket_index);
 
     ht_entry* entry = &table->entries[bucket_index];
     ht_subtable* subtable = entry->subtable;
 
-    //find the sub bucket index in the subtable - if it is not shared, this is hashed by uid.
-    //if it is shared, hash as is done in linux
+    //find the sub bucket index in the subtable, this is done by address.
 
     size_t sub_bucket_index;
 
-    if(!shared)
-    {
-        //if not shared, hash by uid
-        sub_bucket_index = uid % subtable->capacity;
-    }
-    else
-    {
-        //in the shared bucket, hash by address as in original implementation in linux
-        sub_bucket_index = jhash(&key, sizeof(key), 0) % subtable->capacity;
-    }
+    sub_bucket_index = jhash(&key, sizeof(key), 0) % subtable->capacity;
 
     printf("sub_bucket_index: %lu\n", sub_bucket_index);
 
@@ -228,7 +218,7 @@ ht_entry_item* get_entry_item(ht* table, const char* key, int uid, bool shared)
 {
     //find an item given a key and uid (and if it's shared or not)
 
-    size_t bucket_index = get_bucket_index((void*)key, shared);
+    size_t bucket_index = get_bucket_index(table, uid, shared);
     ht_entry* entry = &table->entries[bucket_index];
 
     if (entry->subtable == NULL)
@@ -241,16 +231,8 @@ ht_entry_item* get_entry_item(ht* table, const char* key, int uid, bool shared)
     ht_subtable* subtable = entry->subtable;
     size_t sub_bucket_index;
 
-    if(!shared)
-    {
-        //if not shared, hash by uid
-        sub_bucket_index = uid % subtable->capacity;
-    }
-    else
-    {
-        //if shared, hash by address
-        sub_bucket_index = jhash(&key, sizeof(key), 0) % subtable->capacity;
-    }
+    //hashed by addr
+    sub_bucket_index = jhash(&key, sizeof(key), 0) % subtable->capacity;
     ht_subentry* subtable_entry = &subtable->entries[sub_bucket_index];
 
     if(subtable_entry == NULL)
@@ -280,7 +262,7 @@ ht_entry_item* get_entry_item(ht* table, const char* key, int uid, bool shared)
 
 int ht_remove_entry(ht* table, const char* key, int uid) //possibly refactor using get entry item, reduce duplication?
 {
-    size_t bucket_index = get_bucket_index((void*)key, 0);
+    size_t bucket_index = get_bucket_index(table, uid, 0); //implement the shared case TODO
     printf("bucket_index: %lu\n", bucket_index);
 
     ht_entry* entry = &table->entries[bucket_index];
@@ -297,7 +279,7 @@ int ht_remove_entry(ht* table, const char* key, int uid) //possibly refactor usi
         return -1;
     }
 
-    size_t sub_bucket_index = uid % subtable->capacity;
+    size_t sub_bucket_index = jhash(&key, sizeof(key), 0) % subtable->capacity;
     ht_subentry* subtable_entry = &subtable->entries[sub_bucket_index];
     if(&subtable->entries[sub_bucket_index] == NULL)
     {
@@ -331,6 +313,11 @@ int ht_remove_entry(ht* table, const char* key, int uid) //possibly refactor usi
 
     for (size_t j = i; j < entry_list->count - 1; j++)
     {
+        if(entry_list->items[j + 1].key == NULL)
+        {
+            printf("Nothing to shift\n");
+            break;
+        }
         entry_list->items[j] = entry_list->items[j + 1];
     }
     entry_list->count--;
@@ -341,6 +328,7 @@ int ht_remove_entry(ht* table, const char* key, int uid) //possibly refactor usi
         free(entry_list->items);
         entry_list->items = NULL;
         free(entry_list);
+        return 0;
     }
 
     //if array is too large, shrink it
@@ -361,6 +349,7 @@ int ht_remove_entry(ht* table, const char* key, int uid) //possibly refactor usi
         entry_list->items = new_items;
         entry_list->capacity = new_capacity;
         printf("Shrunk the list.\n");
+        return 0;
     }
 }
 
@@ -382,7 +371,7 @@ void print_entries_in_subtable(ht* table, int uid, size_t bucket_index)
         return;
     }
 
-    size_t sub_bucket_index = uid % subtable->capacity;
+    size_t sub_bucket_index = jhash(&uid, sizeof(uid), 0) % subtable->capacity;
     ht_subentry* subtable_entry = &subtable->entries[sub_bucket_index];
     if(&subtable->entries[sub_bucket_index] == NULL)
     {

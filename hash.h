@@ -47,7 +47,7 @@ typedef struct {
 ht* ht_create(size_t capacity);
 
 // based on a key's addr and if it's shared or not, hash to a bucket index
-size_t get_bucket_index(void* addr, bool shared);
+size_t get_bucket_index(ht* table, int uid, bool shared);
 
 // create a subtable and return a pointer to it, or NULL if out of memory
 ht_subtable* ht_subtable_create(size_t capacity);
@@ -72,9 +72,9 @@ void resize_test(ht* table);
 
 #define INIT_SUBLIST_SIZE 32 //32 for now, we will test
 #define SHARED_SUBBUCKETS_AMNT 128 //128 for now, we will test
-#define SUBBUCKETS_AMNT 32
-#define BUCKETS_AMNT 8192  // mirrors a representative amount of buckets in the futex hash table (which is some multiple of cpu count)
-#define SHARED_BUCKET_INDEX (BUCKETS_AMNT - 1) // the index of the shared bucket
+#define SUBBUCKETS_AMNT 64
+//#define BUCKETS_AMNT 8192  not used in the flipped hierarchy
+//#define SHARED_BUCKET_INDEX not used in the flipped hierarchy
 #define SHARED_RESIZE_FACTOR 2 // the factor by which the shared bucket will resize
 #define LIST_EMPTINESS_THRESHOLD 4 // the threshold at which a list will shrink
 #define LIST_SHRINK_FACTOR 2 // the factor by which a list will shrink when it gets too empty

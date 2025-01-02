@@ -16,7 +16,19 @@ int main()
     printf("5. \"exit\": Exit the program.\n");
     char* command = (char*)malloc(10); //not concerned with safe input handling, just a testbench program
 
-    ht* table = ht_create(BUCKETS_AMNT);
+    printf("This is the flipped hierarchy branch. The hash table's top level bucket is hashed by uid, and the subtable's buckets are hashed by address.\n");
+    printf("How many users will this table be used by? ");
+    int users;
+    do
+    {
+        scanf("%d", &users);
+        if(users < 1)
+        {
+            printf("Please enter a valid number of users (i.e greater than 1).\n");
+        }
+    } while(users < 1);
+
+    ht* table = ht_create(users + 1); //+1 for the shared bucket
     if(table == NULL)
     {
         perror("Error: Memory allocation for main table failed\n");
@@ -45,9 +57,11 @@ int main()
 
             printf("Enter value: ");
             scanf("%s", value);
-
-            printf("Enter uid: ");
-            scanf("%d", &uid);
+            do
+            {
+                printf("Enter uid, which should be between 1 and %d : ", users);
+                scanf("%d", &uid);
+            } while(uid < 1 || uid > users);
 
             printf("uid is %d\n", uid);
 
@@ -103,7 +117,6 @@ int main()
             printf("Enter uid: ");
             scanf("%d", &uid);
 
-            
             printf("Enter bucket index: ");
             scanf("%lu", &bucket_index);
 
